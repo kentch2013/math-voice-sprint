@@ -289,6 +289,13 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
   const resetTranscript = useCallback(() => {
     setTranscript('');
     setInterimTranscript('');
+    if (recognitionRef.current && shouldListenRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {
+        // Ignore
+      }
+    }
   }, []);
 
   // Cleanup on unmount

@@ -41,6 +41,15 @@ describe('numberWords', () => {
       expect(extractNumbersFromUtterance('六 乘以 七 等于 四十二')).toEqual([6, 7, 42]);
       expect(extractNumbersFromUtterance('一百')).toEqual([100]);
     });
+
+    it('extracts repeated single digits and concatenated speech runs', () => {
+      expect(extractNumbersFromUtterance('666')).toContain(6);
+      expect(extractNumbersFromUtterance('81666')).toContain(81);
+      expect(extractNumbersFromUtterance('81666')).toContain(6);
+      expect(extractNumbersFromUtterance('六六六')).toContain(6);
+      expect(extractNumbersFromUtterance('八十一六六六')).toContain(81);
+      expect(extractNumbersFromUtterance('八十一六六六')).toContain(6);
+    });
   });
 
   describe('checkUtteranceMatchesAnswer', () => {
@@ -60,6 +69,14 @@ describe('numberWords', () => {
       expect(checkUtteranceMatchesAnswer('二十四', 24)).toBe(true);
       expect(checkUtteranceMatchesAnswer('四十二', 42)).toBe(true);
       expect(checkUtteranceMatchesAnswer('答案是二十四', 24)).toBe(true);
+    });
+
+    it('returns true for repeated digits and concatenated runs matching expected answer', () => {
+      expect(checkUtteranceMatchesAnswer('81666', 6)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('666', 6)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('六六六', 6)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('6 6 6', 6)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('81 666', 6)).toBe(true);
     });
 
     it('returns false when answer is not present', () => {

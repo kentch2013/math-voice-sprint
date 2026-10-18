@@ -100,6 +100,8 @@ export function useGameEngine() {
       }
     };
 
+    resetTranscriptRef.current();
+
     // If timeout, display the correct answer for 3 seconds before advancing
     if (inputMethod === 'timeout') {
       isTransitioningRef.current = true;
