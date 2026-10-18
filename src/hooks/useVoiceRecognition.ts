@@ -38,10 +38,13 @@ declare global {
 export interface UseVoiceRecognitionOptions {
   onTranscriptChange?: (text: string) => void;
   noiseGateThreshold?: number; // RMS threshold (0.0 to 1.0)
+  lang?: string;
+  language?: string;
 }
 
 export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
-  const { onTranscriptChange, noiseGateThreshold = 0.03 } = options;
+  const { onTranscriptChange, noiseGateThreshold = 0.03, lang = 'en-US', language } = options;
+  const activeLang = language || lang;
 
   const onTranscriptChangeRef = useRef(onTranscriptChange);
 
@@ -64,6 +67,12 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
   useEffect(() => {
     onTranscriptChangeRef.current = onTranscriptChange;
   }, [onTranscriptChange]);
+
+  useEffect(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = activeLang;
+    }
+  }, [activeLang]);
 
   // Cleanup audio context and media stream
   const stopAudioAnalysis = useCallback(() => {
@@ -154,7 +163,7 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
       const instance = new SpeechClass();
       instance.continuous = true;
       instance.interimResults = true;
-      instance.lang = 'en-US';
+      instance.lang = activeLang;
 
       instance.onstart = () => {
         setIsListening(true);
@@ -222,7 +231,7 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
     } catch {
       // Recognition might already be running
     }
-  }, [startAudioAnalysis]);
+  }, [startAudioAnalysis, activeLang]);
 
   // Stop listening
   const stopListening = useCallback(() => {
@@ -277,5 +286,6 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
     startListening,
     stopListening,
     resetTranscript,
+    lang: activeLang,
   };
 }
