@@ -179,18 +179,23 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
         const trimmedFinal = finalTranscriptStr.trim();
         const trimmedInterim = interimTranscriptStr.trim();
 
-        if (trimmedFinal) {
-          setTranscript((prev) => {
-            const updated = prev ? `${prev} ${trimmedFinal}` : trimmedFinal;
-            if (onTranscriptChange) onTranscriptChange(updated);
-            return updated;
-          });
-        }
-
         setInterimTranscript(trimmedInterim);
-        if (trimmedInterim && onTranscriptChange) {
-          onTranscriptChange(trimmedInterim);
-        }
+
+        setTranscript((prevFinal) => {
+          const newFinal = trimmedFinal
+            ? prevFinal
+              ? `${prevFinal} ${trimmedFinal}`
+              : trimmedFinal
+            : prevFinal;
+
+          const combined = [newFinal, trimmedInterim].filter(Boolean).join(' ');
+
+          if (combined && onTranscriptChange) {
+            onTranscriptChange(combined);
+          }
+
+          return newFinal;
+        });
       };
 
       instance.onerror = (event: SpeechRecognitionErrorEvent) => {

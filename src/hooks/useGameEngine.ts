@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { MathProblem, QuestionResult, GameSession } from '../types';
 import { generateMathProblems } from '../utils/mathGenerator';
-import { checkUtteranceMatchesAnswer } from '../utils/numberWords';
+import { checkUtteranceMatchesAnswer, mergeTokens } from '../utils/numberWords';
 import { playCorrectChime } from '../utils/audioSynthesizer';
 import { useVoiceRecognition } from './useVoiceRecognition';
 
@@ -33,8 +33,11 @@ export function useGameEngine() {
   const questionStartTimeRef = useRef<number>(Date.now());
   const silenceTimeRef = useRef<number>(0);
   const isTransitioningRef = useRef<boolean>(false);
+  const spokenTokensRef = useRef<string[]>([]);
 
   const currentProblem: MathProblem | undefined = problems[currentIndex];
+
+  const voiceRecognitionRef = useRef<ReturnType<typeof useVoiceRecognition> | null>(null);
 
   // Forward declarations for callbacks
   const finishGameRef = useRef<(finalResults: QuestionResult[]) => void>(() => {});
@@ -74,7 +77,8 @@ export function useGameEngine() {
     setResults(updatedResults);
 
     const advanceToNext = () => {
-      voiceRecognition.resetTranscript();
+      spokenTokensRef.current = [];
+      voiceRecognitionRef.current?.resetTranscript();
       setKeypadInput('');
       setAttemptsCount(0);
       setShowSilenceNudge(false);
@@ -112,8 +116,27 @@ export function useGameEngine() {
     silenceTimeRef.current = 0;
     setShowSilenceNudge(false);
 
-    // Evaluate whole sentence or any substring token against expected answer
-    if (checkUtteranceMatchesAnswer(text, currentProblem.expectedAnswer)) {
+    // Tokenize and aggregate streaming speech into active rolling token window
+    const newTokens = text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .replace(/-/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    spokenTokensRef.current = mergeTokens(spokenTokensRef.current, newTokens);
+    if (spokenTokensRef.current.length > 20) {
+      spokenTokensRef.current = spokenTokensRef.current.slice(spokenTokensRef.current.length - 20);
+    }
+
+    const aggregatedUtterance = spokenTokensRef.current.join(' ');
+
+    // Evaluate incoming text OR aggregated rolling utterance against expected answer
+    if (
+      checkUtteranceMatchesAnswer(text, currentProblem.expectedAnswer) ||
+      checkUtteranceMatchesAnswer(aggregatedUtterance, currentProblem.expectedAnswer)
+    ) {
       submitAnswer(currentProblem.expectedAnswer, 'voice');
     }
   }, [status, currentProblem, submitAnswer]);
@@ -121,6 +144,7 @@ export function useGameEngine() {
   const voiceRecognition = useVoiceRecognition({
     onTranscriptChange: handleVoiceTranscript,
   });
+  voiceRecognitionRef.current = voiceRecognition;
 
   // Start new game session
   const startGame = useCallback(() => {
@@ -142,6 +166,7 @@ export function useGameEngine() {
     startTimeRef.current = now;
     questionStartTimeRef.current = now;
 
+    spokenTokensRef.current = [];
     voiceRecognition.resetTranscript();
     voiceRecognition.startListening();
   }, [voiceRecognition]);

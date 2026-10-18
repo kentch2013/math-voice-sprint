@@ -1,6 +1,7 @@
 const SMALL_NUMBERS: Record<string, number> = {
   zero: 0,
   one: 1,
+  won: 1,
   two: 2,
   to: 2,
   too: 2,
@@ -40,8 +41,8 @@ const TENS_NUMBERS: Record<string, number> = {
 
 /**
  * Extracts all numbers mentioned in an utterance.
- * Handles digits ("24"), homophones ("for", "ate", "to"), compound words ("forty two", "forty-two"),
- * and single words ("twelve", "81").
+ * Handles digits ("24"), homophones ("won", "for", "ate", "to"), compound words ("forty two", "forty-two"),
+ * single words ("twelve", "81"), and streaming tens + ones.
  * Returns an array of numbers in order of appearance.
  */
 export function extractNumbersFromUtterance(utterance: string): number[] {
@@ -60,26 +61,49 @@ export function extractNumbersFromUtterance(utterance: string): number[] {
   while (i < tokens.length) {
     const token = tokens[i];
 
-    // 1. Direct digit tokens (e.g. "42", "6", "18")
+    // 1. Direct digit tokens (e.g. "42", "6", "18") or digit tens + ones ("20 1")
     if (/^\d+$/.test(token)) {
-      foundNumbers.push(parseInt(token, 10));
-      i++;
-      continue;
-    }
-
-    // 2. Check compound tens + ones (e.g. "forty two", "twenty-four")
-    if (TENS_NUMBERS[token] !== undefined) {
-      if (i + 1 < tokens.length && SMALL_NUMBERS[tokens[i + 1]] !== undefined) {
-        foundNumbers.push(TENS_NUMBERS[token] + SMALL_NUMBERS[tokens[i + 1]]);
-        i += 2;
-        continue;
+      const val = parseInt(token, 10);
+      if (val >= 20 && val <= 90 && val % 10 === 0 && i + 1 < tokens.length) {
+        const nextTok = tokens[i + 1];
+        if (/^[1-9]$/.test(nextTok)) {
+          foundNumbers.push(val + parseInt(nextTok, 10));
+          i += 2;
+          continue;
+        }
+        if (SMALL_NUMBERS[nextTok] !== undefined && SMALL_NUMBERS[nextTok] >= 1 && SMALL_NUMBERS[nextTok] <= 9) {
+          foundNumbers.push(val + SMALL_NUMBERS[nextTok]);
+          i += 2;
+          continue;
+        }
       }
-      foundNumbers.push(TENS_NUMBERS[token]);
+      foundNumbers.push(val);
       i++;
       continue;
     }
 
-    // 3. Small numbers / teens / homophones (e.g. "sixteen", "eight", "for" -> 4)
+    // 2. Check compound tens + ones (e.g. "forty two", "twenty-four", "twenty 1")
+    if (TENS_NUMBERS[token] !== undefined) {
+      const tensVal = TENS_NUMBERS[token];
+      if (i + 1 < tokens.length) {
+        const nextTok = tokens[i + 1];
+        if (SMALL_NUMBERS[nextTok] !== undefined && SMALL_NUMBERS[nextTok] >= 1 && SMALL_NUMBERS[nextTok] <= 9) {
+          foundNumbers.push(tensVal + SMALL_NUMBERS[nextTok]);
+          i += 2;
+          continue;
+        }
+        if (/^[1-9]$/.test(nextTok)) {
+          foundNumbers.push(tensVal + parseInt(nextTok, 10));
+          i += 2;
+          continue;
+        }
+      }
+      foundNumbers.push(tensVal);
+      i++;
+      continue;
+    }
+
+    // 3. Small numbers / teens / homophones (e.g. "sixteen", "eight", "for" -> 4, "won" -> 1)
     if (SMALL_NUMBERS[token] !== undefined) {
       foundNumbers.push(SMALL_NUMBERS[token]);
       i++;
@@ -111,6 +135,33 @@ export function checkUtteranceMatchesAnswer(utterance: string, expectedAnswer: n
   }
 
   return false;
+}
+
+/**
+ * Merges two token sequences by identifying overlap between the suffix of existingTokens
+ * and the prefix of newTokens.
+ */
+export function mergeTokens(existingTokens: string[], newTokens: string[]): string[] {
+  if (!newTokens.length) return existingTokens;
+  if (!existingTokens.length) return newTokens;
+
+  const maxOverlap = Math.min(existingTokens.length, newTokens.length);
+  for (let k = maxOverlap; k > 0; k--) {
+    const existingSuffix = existingTokens.slice(existingTokens.length - k);
+    const newPrefix = newTokens.slice(0, k);
+    let match = true;
+    for (let i = 0; i < k; i++) {
+      if (existingSuffix[i] !== newPrefix[i]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      return [...existingTokens, ...newTokens.slice(k)];
+    }
+  }
+
+  return [...existingTokens, ...newTokens];
 }
 
 /**
