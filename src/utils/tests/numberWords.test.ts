@@ -42,6 +42,19 @@ describe('numberWords', () => {
       expect(extractNumbersFromUtterance('一百')).toEqual([100]);
     });
 
+    it('extracts Mandarin Chinese homophones and speech variants', () => {
+      expect(extractNumbersFromUtterance('酒')).toEqual([9]);
+      expect(extractNumbersFromUtterance('久')).toEqual([9]);
+      expect(extractNumbersFromUtterance('死')).toEqual([4]);
+      expect(extractNumbersFromUtterance('吧')).toEqual([8]);
+      expect(extractNumbersFromUtterance('尔')).toEqual([2]);
+      expect(extractNumbersFromUtterance('九久')).toEqual([90]);
+      expect(extractNumbersFromUtterance('久久')).toEqual([90]);
+      expect(extractNumbersFromUtterance('酒拾')).toEqual([90]);
+      expect(extractNumbersFromUtterance('酒拾九')).toEqual([99]);
+      expect(extractNumbersFromUtterance('九久九')).toEqual([99]);
+    });
+
     it('extracts repeated single digits and concatenated speech runs', () => {
       expect(extractNumbersFromUtterance('666')).toContain(6);
       expect(extractNumbersFromUtterance('81666')).toContain(81);
@@ -71,6 +84,16 @@ describe('numberWords', () => {
       expect(checkUtteranceMatchesAnswer('答案是二十四', 24)).toBe(true);
     });
 
+    it('returns true for Mandarin Chinese homophones matching expected answer', () => {
+      expect(checkUtteranceMatchesAnswer('酒', 9)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('久', 9)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('久久', 90)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('九久', 90)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('酒拾九', 99)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('九久九', 99)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('答案是酒', 9)).toBe(true);
+    });
+
     it('returns true for repeated digits and concatenated runs matching expected answer', () => {
       expect(checkUtteranceMatchesAnswer('81666', 6)).toBe(true);
       expect(checkUtteranceMatchesAnswer('666', 6)).toBe(true);
@@ -94,6 +117,7 @@ describe('numberWords', () => {
     it('returns the last extracted number', () => {
       expect(parseNumberFromUtterance('10 20 30')).toBe(30);
       expect(parseNumberFromUtterance('答案是二十四')).toBe(24);
+      expect(parseNumberFromUtterance('答案是酒拾九')).toBe(99);
     });
   });
 });
