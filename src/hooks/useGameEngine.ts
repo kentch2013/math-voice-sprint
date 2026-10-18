@@ -11,7 +11,11 @@ export const QUESTION_TIME_LIMIT = 30; // 30 seconds
 export const SILENCE_NUDGE_TIME = 10;   // 10 seconds silence detection nudge
 export const AUTO_RESTART_TIME = 15;   // 15 seconds session restart countdown
 
-export function useGameEngine() {
+export interface UseGameEngineOptions {
+  lang?: string;
+}
+
+export function useGameEngine(options: UseGameEngineOptions = {}) {
   const [status, setStatus] = useState<GameStatus>('idle');
   const [problems, setProblems] = useState<MathProblem[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -135,6 +139,7 @@ export function useGameEngine() {
 
   const voiceRecognition = useVoiceRecognition({
     onTranscriptChange: handleVoiceTranscript,
+    lang: options.lang,
   });
 
   useEffect(() => {

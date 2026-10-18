@@ -35,15 +35,21 @@ declare global {
   }
 }
 
+export type VoiceLanguage = 'en-US' | 'zh-CN' | string;
+
 export interface UseVoiceRecognitionOptions {
   onTranscriptChange?: (text: string) => void;
   noiseGateThreshold?: number; // RMS threshold (0.0 to 1.0)
+  lang?: VoiceLanguage;
 }
 
 export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
-  const { onTranscriptChange, noiseGateThreshold = 0.03 } = options;
+  const { onTranscriptChange, noiseGateThreshold = 0.03, lang = 'en-US' } = options;
 
   const onTranscriptChangeRef = useRef(onTranscriptChange);
+
+  const [language, setLanguageState] = useState<string>(lang);
+  const languageRef = useRef<string>(language);
 
   const [transcript, setTranscript] = useState<string>('');
   const [interimTranscript, setInterimTranscript] = useState<string>('');
@@ -64,6 +70,40 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
   useEffect(() => {
     onTranscriptChangeRef.current = onTranscriptChange;
   }, [onTranscriptChange]);
+
+  useEffect(() => {
+    if (lang && lang !== languageRef.current) {
+      setLanguageState(lang);
+      languageRef.current = lang;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.lang = lang;
+        } catch {
+          // Ignore
+        }
+      }
+    }
+  }, [lang]);
+
+  const setLanguage = useCallback((newLang: string) => {
+    setLanguageState(newLang);
+    languageRef.current = newLang;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.lang = newLang;
+      } catch {
+        // Ignore
+      }
+      if (shouldListenRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // Ignore
+        }
+      }
+    }
+  }, []);
 
   // Cleanup audio context and media stream
   const stopAudioAnalysis = useCallback(() => {
@@ -154,7 +194,7 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
       const instance = new SpeechClass();
       instance.continuous = true;
       instance.interimResults = true;
-      instance.lang = 'en-US';
+      instance.lang = languageRef.current || 'en-US';
 
       instance.onstart = () => {
         setIsListening(true);
@@ -205,6 +245,7 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
           restartTimeoutRef.current = setTimeout(() => {
             if (shouldListenRef.current && recognitionRef.current) {
               try {
+                recognitionRef.current.lang = languageRef.current || 'en-US';
                 recognitionRef.current.start();
               } catch {
                 // Ignore if already running
@@ -215,6 +256,8 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
       };
 
       recognitionRef.current = instance;
+    } else {
+      recognitionRef.current.lang = languageRef.current || 'en-US';
     }
 
     try {
@@ -274,6 +317,8 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
     isSpeechDetected,
     error,
     isSupported,
+    language,
+    setLanguage,
     startListening,
     stopListening,
     resetTranscript,
