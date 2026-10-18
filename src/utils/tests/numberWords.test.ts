@@ -28,6 +28,15 @@ describe('numberWords', () => {
       expect(extractNumbersFromUtterance('forty two')).toEqual([42]);
       expect(extractNumbersFromUtterance('twenty-four')).toEqual([24]);
     });
+
+    it('extracts repeated single digits and concatenated speech runs', () => {
+      expect(extractNumbersFromUtterance('666')).toContain(6);
+      expect(extractNumbersFromUtterance('81666')).toContain(81);
+      expect(extractNumbersFromUtterance('81666')).toContain(6);
+      expect(extractNumbersFromUtterance('六六六')).toContain(6);
+      expect(extractNumbersFromUtterance('八十一六六六')).toContain(81);
+      expect(extractNumbersFromUtterance('八十一六六六')).toContain(6);
+    });
   });
 
   describe('checkUtteranceMatchesAnswer', () => {
@@ -40,6 +49,14 @@ describe('numberWords', () => {
       expect(checkUtteranceMatchesAnswer('thirty', 30)).toBe(true);
       expect(checkUtteranceMatchesAnswer('30 30 30', 30)).toBe(true);
       expect(checkUtteranceMatchesAnswer('the answer is 30', 30)).toBe(true);
+    });
+
+    it('returns true for repeated digits and concatenated runs matching expected answer', () => {
+      expect(checkUtteranceMatchesAnswer('81666', 6)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('666', 6)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('六六六', 6)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('6 6 6', 6)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('81 666', 6)).toBe(true);
     });
 
     it('returns false when answer is not present', () => {
