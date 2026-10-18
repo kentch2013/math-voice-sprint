@@ -3,7 +3,7 @@ import type { MathProblem, QuestionResult, GameSession } from '../types';
 import { generateMathProblems } from '../utils/mathGenerator';
 import { checkUtteranceMatchesAnswer } from '../utils/numberWords';
 import { playCorrectChime } from '../utils/audioSynthesizer';
-import { useVoiceRecognition } from './useVoiceRecognition';
+import { useVoiceRecognition, type VoiceLanguage } from './useVoiceRecognition';
 
 export type GameStatus = 'idle' | 'playing' | 'completed';
 
@@ -16,6 +16,7 @@ export function useGameEngine() {
   const [problems, setProblems] = useState<MathProblem[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [results, setResults] = useState<QuestionResult[]>([]);
+  const [language, setLanguage] = useState<VoiceLanguage>('en-US');
 
   // Timers
   const [questionTimeLeft, setQuestionTimeLeft] = useState<number>(QUESTION_TIME_LIMIT);
@@ -135,11 +136,16 @@ export function useGameEngine() {
 
   const voiceRecognition = useVoiceRecognition({
     onTranscriptChange: handleVoiceTranscript,
+    language,
   });
 
   useEffect(() => {
     resetTranscriptRef.current = voiceRecognition.resetTranscript;
   }, [voiceRecognition.resetTranscript]);
+
+  const toggleLanguage = useCallback(() => {
+    setLanguage((prev) => (prev === 'en-US' ? 'zh-CN' : 'en-US'));
+  }, []);
 
   // Start new game session
   const startGame = useCallback(() => {
@@ -246,6 +252,9 @@ export function useGameEngine() {
     keypadInput,
     setKeypadInput,
     session,
+    language,
+    setLanguage,
+    toggleLanguage,
     voiceRecognition,
     startGame,
     submitAnswer,

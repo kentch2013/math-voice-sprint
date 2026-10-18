@@ -1,16 +1,25 @@
 import React from 'react';
 import { Play, Mic, Sparkles, Zap } from 'lucide-react';
+import type { VoiceLanguage } from '../hooks/useVoiceRecognition';
+import { LanguageToggle } from './LanguageToggle';
 
 interface StartScreenProps {
   onStart: () => void;
   isVoiceSupported: boolean;
+  language: VoiceLanguage;
+  onLanguageChange: (lang: VoiceLanguage) => void;
 }
 
-export const StartScreen: React.FC<StartScreenProps> = ({ onStart, isVoiceSupported }) => {
+export const StartScreen: React.FC<StartScreenProps> = ({
+  onStart,
+  isVoiceSupported,
+  language,
+  onLanguageChange,
+}) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 border-4 border-indigo-200">
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center mb-4">
           <div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 animate-bounce">
             <Zap size={48} />
           </div>
@@ -20,9 +29,17 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart, isVoiceSuppor
           Math Sprint!
         </h1>
 
-        <p className="text-lg text-slate-600 mb-6">
+        <p className="text-lg text-slate-600 mb-4">
           Shout out or type the answer to 10 multiplication questions as fast as you can!
         </p>
+
+        {/* Language Selection Switch */}
+        <div className="mb-6 flex flex-col items-center gap-1.5">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Voice Language Mode
+          </span>
+          <LanguageToggle language={language} onLanguageChange={onLanguageChange} />
+        </div>
 
         <div className="bg-indigo-50 rounded-2xl p-4 mb-6 border border-indigo-100 text-left">
           <h2 className="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -31,7 +48,11 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart, isVoiceSuppor
           <ul className="text-sm text-slate-700 space-y-2">
             <li className="flex items-start gap-2">
               <span className="font-bold text-indigo-600">•</span>
-              <span>Say your answer out loud when you see the math problem.</span>
+              <span>
+                {language === 'zh-CN'
+                  ? 'Say your answer out loud in Mandarin Chinese (中文) or English when you see the math problem.'
+                  : 'Say your answer out loud when you see the math problem.'}
+              </span>
             </li>
             <li className="flex items-start gap-2">
               <span className="font-bold text-indigo-600">•</span>

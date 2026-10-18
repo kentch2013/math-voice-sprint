@@ -38,14 +38,99 @@ const TENS_NUMBERS: Record<string, number> = {
   ninety: 90,
 };
 
+// Chinese single digits and basic values
+const CHINESE_DIGITS: Record<string, number> = {
+  '零': 0, '0': 0,
+  '一': 1, '1': 1,
+  '二': 2, '两': 2, '2': 2,
+  '三': 3, '3': 3,
+  '四': 4, '4': 4,
+  '五': 5, '5': 5,
+  '六': 6, '6': 6,
+  '七': 7, '7': 7,
+  '八': 8, '8': 8,
+  '九': 9, '9': 9,
+};
+
+/**
+ * Extracts Chinese numbers from a string.
+ * Supports single digits, 10-99 (e.g., 十, 十二, 二十, 二十四, 四十二), and 100 (一百).
+ */
+function extractChineseNumbers(utterance: string): number[] {
+  if (!utterance) return [];
+
+  const numbers: number[] = [];
+  const len = utterance.length;
+  let i = 0;
+
+  while (i < len) {
+    const char = utterance[i];
+
+    // Check for "一百" / "100"
+    if (utterance.substring(i, i + 2) === '一百') {
+      numbers.push(100);
+      i += 2;
+      continue;
+    }
+
+    // Check for "十" (10 or multiplier)
+    if (char === '十') {
+      // standalone 十 -> 10 or 十X -> 10 + X
+      let nextVal = 0;
+      let consumed = 1;
+      if (i + 1 < len && CHINESE_DIGITS[utterance[i + 1]] !== undefined) {
+        nextVal = CHINESE_DIGITS[utterance[i + 1]];
+        consumed = 2;
+      }
+      numbers.push(10 + nextVal);
+      i += consumed;
+      continue;
+    }
+
+    // Check if char is a Chinese digit (一..九, 两, 二, 零)
+    if (CHINESE_DIGITS[char] !== undefined) {
+      const firstVal = CHINESE_DIGITS[char];
+
+      // Check if followed by "十" e.g., 二十 (20) or 二十四 (24)
+      if (i + 1 < len && utterance[i + 1] === '十') {
+        let secondVal = 0;
+        let consumed = 2;
+        if (i + 2 < len && CHINESE_DIGITS[utterance[i + 2]] !== undefined) {
+          secondVal = CHINESE_DIGITS[utterance[i + 2]];
+          consumed = 3;
+        }
+        numbers.push(firstVal * 10 + secondVal);
+        i += consumed;
+        continue;
+      }
+
+      numbers.push(firstVal);
+      i++;
+      continue;
+    }
+
+    i++;
+  }
+
+  return numbers;
+}
+
 /**
  * Extracts all numbers mentioned in an utterance.
  * Handles digits ("24"), homophones ("for", "ate", "to"), compound words ("forty two", "forty-two"),
- * and single words ("twelve", "81").
+ * single words ("twelve", "81"), and Chinese number words ("二十四", "四十二", "八").
  * Returns an array of numbers in order of appearance.
  */
 export function extractNumbersFromUtterance(utterance: string): number[] {
   if (!utterance) return [];
+
+  const foundNumbers: number[] = [];
+
+  // Extract Chinese numbers if utterance contains Chinese characters
+  if (/[\u4e00-\u9fa5]/.test(utterance)) {
+    const chineseNums = extractChineseNumbers(utterance);
+    foundNumbers.push(...chineseNums);
+  }
 
   const normalized = utterance
     .toLowerCase()
@@ -54,7 +139,6 @@ export function extractNumbersFromUtterance(utterance: string): number[] {
     .trim();
 
   const tokens = normalized.split(/\s+/).filter(Boolean);
-  const foundNumbers: number[] = [];
 
   let i = 0;
   while (i < tokens.length) {

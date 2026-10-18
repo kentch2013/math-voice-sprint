@@ -1,6 +1,8 @@
 import React from 'react';
 import { Mic, MicOff, Volume2, Timer, MessageSquareHeart } from 'lucide-react';
 import type { MathProblem } from '../types';
+import type { VoiceLanguage } from '../hooks/useVoiceRecognition';
+import { LanguageToggle } from './LanguageToggle';
 
 interface GameBoardProps {
   problem: MathProblem;
@@ -13,6 +15,8 @@ interface GameBoardProps {
   volumeLevel: number;
   isSpeechDetected: boolean;
   keypadInput: string;
+  language: VoiceLanguage;
+  onLanguageChange: (lang: VoiceLanguage) => void;
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({
@@ -26,13 +30,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   volumeLevel,
   isSpeechDetected,
   keypadInput,
+  language,
+  onLanguageChange,
 }) => {
   const currentDisplayedTranscript = interimTranscript || transcript;
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 flex flex-col items-center">
       {/* Timer and Status Bar */}
-      <div className="w-full flex justify-between items-center bg-white rounded-2xl p-4 shadow-md mb-6 border border-slate-200">
+      <div className="w-full flex justify-between items-center bg-white rounded-2xl p-4 shadow-md mb-6 border border-slate-200 gap-2 flex-wrap sm:flex-nowrap">
         <div className="flex items-center gap-2">
           <div
             className={`flex items-center justify-center p-2 rounded-xl ${
@@ -54,6 +60,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             </span>
           </div>
         </div>
+
+        {/* In-game Language Switcher */}
+        <LanguageToggle language={language} onLanguageChange={onLanguageChange} />
 
         {/* Live Microphone Status Indicator */}
         <div className="flex items-center gap-3">

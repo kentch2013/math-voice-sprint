@@ -19,6 +19,8 @@ export function App() {
     keypadInput,
     setKeypadInput,
     session,
+    language,
+    setLanguage,
     voiceRecognition,
     startGame,
     submitAnswer,
@@ -55,6 +57,8 @@ export function App() {
           <StartScreen
             onStart={startGame}
             isVoiceSupported={voiceRecognition.isSupported}
+            language={language}
+            onLanguageChange={setLanguage}
           />
         )}
 
@@ -79,6 +83,8 @@ export function App() {
                   volumeLevel={voiceRecognition.volumeLevel}
                   isSpeechDetected={voiceRecognition.isSpeechDetected}
                   keypadInput={keypadInput}
+                  language={language}
+                  onLanguageChange={setLanguage}
                 />
 
                 <Keypad

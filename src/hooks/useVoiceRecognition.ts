@@ -35,13 +35,16 @@ declare global {
   }
 }
 
+export type VoiceLanguage = 'en-US' | 'zh-CN';
+
 export interface UseVoiceRecognitionOptions {
   onTranscriptChange?: (text: string) => void;
   noiseGateThreshold?: number; // RMS threshold (0.0 to 1.0)
+  language?: VoiceLanguage;
 }
 
 export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
-  const { onTranscriptChange, noiseGateThreshold = 0.03 } = options;
+  const { onTranscriptChange, noiseGateThreshold = 0.03, language = 'en-US' } = options;
 
   const onTranscriptChangeRef = useRef(onTranscriptChange);
 
@@ -60,10 +63,16 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const languageRef = useRef<VoiceLanguage>(language);
 
   useEffect(() => {
     onTranscriptChangeRef.current = onTranscriptChange;
   }, [onTranscriptChange]);
+
+  // Keep languageRef up-to-date
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
 
   // Cleanup audio context and media stream
   const stopAudioAnalysis = useCallback(() => {
@@ -136,6 +145,78 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
     }
   }, [noiseGateThreshold]);
 
+  // Create speech recognition instance if needed
+  const createRecognitionInstance = useCallback(() => {
+    const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechClass) return null;
+
+    const instance = new SpeechClass();
+    instance.continuous = true;
+    instance.interimResults = true;
+    instance.lang = languageRef.current;
+
+    instance.onstart = () => {
+      setIsListening(true);
+    };
+
+    instance.onresult = (event: SpeechRecognitionEvent) => {
+      let finalTranscriptStr = '';
+      let interimTranscriptStr = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const text = result[0].transcript;
+        if (result.isFinal) {
+          finalTranscriptStr += text + ' ';
+        } else {
+          interimTranscriptStr += text;
+        }
+      }
+
+      const trimmedFinal = finalTranscriptStr.trim();
+      const trimmedInterim = interimTranscriptStr.trim();
+
+      if (trimmedFinal) {
+        setTranscript((prev) => {
+          const updated = prev ? `${prev} ${trimmedFinal}` : trimmedFinal;
+          if (onTranscriptChangeRef.current) onTranscriptChangeRef.current(updated);
+          return updated;
+        });
+      }
+
+      setInterimTranscript(trimmedInterim);
+      if (trimmedInterim && onTranscriptChangeRef.current) {
+        onTranscriptChangeRef.current(trimmedInterim);
+      }
+    };
+
+    instance.onerror = (event: SpeechRecognitionErrorEvent) => {
+      // Ignore non-fatal speech errors like 'no-speech'
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        setError(`Speech recognition error: ${event.error}`);
+      }
+    };
+
+    instance.onend = () => {
+      setIsListening(false);
+      // Auto-restart loop if continuous listening should still be active
+      if (shouldListenRef.current) {
+        restartTimeoutRef.current = setTimeout(() => {
+          if (shouldListenRef.current && recognitionRef.current) {
+            try {
+              recognitionRef.current.lang = languageRef.current;
+              recognitionRef.current.start();
+            } catch {
+              // Ignore if already running
+            }
+          }
+        }, 300);
+      }
+    };
+
+    return instance;
+  }, []);
+
   // Start speech recognition
   const startListening = useCallback(() => {
     const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -151,78 +232,19 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
     startAudioAnalysis();
 
     if (!recognitionRef.current) {
-      const instance = new SpeechClass();
-      instance.continuous = true;
-      instance.interimResults = true;
-      instance.lang = 'en-US';
-
-      instance.onstart = () => {
-        setIsListening(true);
-      };
-
-      instance.onresult = (event: SpeechRecognitionEvent) => {
-        let finalTranscriptStr = '';
-        let interimTranscriptStr = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          const text = result[0].transcript;
-          if (result.isFinal) {
-            finalTranscriptStr += text + ' ';
-          } else {
-            interimTranscriptStr += text;
-          }
-        }
-
-        const trimmedFinal = finalTranscriptStr.trim();
-        const trimmedInterim = interimTranscriptStr.trim();
-
-        if (trimmedFinal) {
-          setTranscript((prev) => {
-            const updated = prev ? `${prev} ${trimmedFinal}` : trimmedFinal;
-            if (onTranscriptChangeRef.current) onTranscriptChangeRef.current(updated);
-            return updated;
-          });
-        }
-
-        setInterimTranscript(trimmedInterim);
-        if (trimmedInterim && onTranscriptChangeRef.current) {
-          onTranscriptChangeRef.current(trimmedInterim);
-        }
-      };
-
-      instance.onerror = (event: SpeechRecognitionErrorEvent) => {
-        // Ignore non-fatal speech errors like 'no-speech'
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          setError(`Speech recognition error: ${event.error}`);
-        }
-      };
-
-      instance.onend = () => {
-        setIsListening(false);
-        // Auto-restart loop if continuous listening should still be active
-        if (shouldListenRef.current) {
-          restartTimeoutRef.current = setTimeout(() => {
-            if (shouldListenRef.current && recognitionRef.current) {
-              try {
-                recognitionRef.current.start();
-              } catch {
-                // Ignore if already running
-              }
-            }
-          }, 300);
-        }
-      };
-
-      recognitionRef.current = instance;
+      recognitionRef.current = createRecognitionInstance();
+    } else {
+      recognitionRef.current.lang = languageRef.current;
     }
 
-    try {
-      recognitionRef.current.start();
-    } catch {
-      // Recognition might already be running
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch {
+        // Recognition might already be running
+      }
     }
-  }, [startAudioAnalysis]);
+  }, [startAudioAnalysis, createRecognitionInstance]);
 
   // Stop listening
   const stopListening = useCallback(() => {
@@ -241,6 +263,27 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
     stopAudioAnalysis();
     setIsListening(false);
   }, [stopAudioAnalysis]);
+
+  // Seamless restart when language changes dynamically
+  useEffect(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = language;
+    }
+
+    // If currently listening, restart seamlessly with new language
+    if (shouldListenRef.current && recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {
+        // Ignore
+      }
+      try {
+        recognitionRef.current.start();
+      } catch {
+        // Ignore
+      }
+    }
+  }, [language]);
 
   // Reset transcript
   const resetTranscript = useCallback(() => {
