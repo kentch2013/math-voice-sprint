@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { MathProblem, QuestionResult, GameSession } from '../types';
 import { generateMathProblems } from '../utils/mathGenerator';
-import { parseNumberFromUtterance } from '../utils/numberWords';
+import { checkUtteranceMatchesAnswer } from '../utils/numberWords';
 import { playCorrectChime } from '../utils/audioSynthesizer';
 import { useVoiceRecognition } from './useVoiceRecognition';
 
@@ -22,30 +22,101 @@ export function useGameEngine() {
   const [showSilenceNudge, setShowSilenceNudge] = useState<boolean>(false);
   const [restartCountdown, setRestartCountdown] = useState<number>(AUTO_RESTART_TIME);
 
+  // Expired answer display state (PRD §5.1: 3-second red/orange answer display)
+  const [showExpiredAnswer, setShowExpiredAnswer] = useState<boolean>(false);
+
   const [attemptsCount, setAttemptsCount] = useState<number>(0);
   const [keypadInput, setKeypadInput] = useState<string>('');
   const [session, setSession] = useState<GameSession | null>(null);
 
   const startTimeRef = useRef<number>(Date.now());
   const questionStartTimeRef = useRef<number>(Date.now());
-  const processedUtteranceRef = useRef<string>('');
   const silenceTimeRef = useRef<number>(0);
+  const isTransitioningRef = useRef<boolean>(false);
 
   const currentProblem: MathProblem | undefined = problems[currentIndex];
 
+  // Forward declarations for callbacks
+  const finishGameRef = useRef<(finalResults: QuestionResult[]) => void>(() => {});
+
+  // Submit an answer (voice, keypad, or timeout)
+  const submitAnswer = useCallback((
+    answer: number | undefined,
+    inputMethod: 'voice' | 'keypad' | 'timeout'
+  ) => {
+    if (!currentProblem || status !== 'playing' || isTransitioningRef.current) return;
+
+    const timeSpent = Math.max(1, Math.round((Date.now() - questionStartTimeRef.current) / 1000));
+    const isCorrect = answer === currentProblem.expectedAnswer;
+
+    // PRD: Incorrect answers do nothing; allow retries until 30s timeout
+    if (!isCorrect && inputMethod !== 'timeout') {
+      setAttemptsCount((prev) => prev + 1);
+      return;
+    }
+
+    if (isCorrect) {
+      playCorrectChime();
+    }
+
+    const newResult: QuestionResult = {
+      questionId: currentProblem.id,
+      problem: `${currentProblem.operandA} x ${currentProblem.operandB}`,
+      expectedAnswer: currentProblem.expectedAnswer,
+      userAnswer: answer,
+      isCorrect,
+      timeSpentSeconds: timeSpent,
+      inputMethod,
+      attemptsCount: attemptsCount + 1,
+    };
+
+    const updatedResults = [...results, newResult];
+    setResults(updatedResults);
+
+    const advanceToNext = () => {
+      voiceRecognition.resetTranscript();
+      setKeypadInput('');
+      setAttemptsCount(0);
+      setShowSilenceNudge(false);
+      setShowExpiredAnswer(false);
+      silenceTimeRef.current = 0;
+      isTransitioningRef.current = false;
+
+      const nextIndex = currentIndex + 1;
+      if (nextIndex < problems.length) {
+        setCurrentIndex(nextIndex);
+        setQuestionTimeLeft(QUESTION_TIME_LIMIT);
+        questionStartTimeRef.current = Date.now();
+      } else {
+        finishGameRef.current(updatedResults);
+      }
+    };
+
+    // If timeout, display the correct answer for 3 seconds before advancing
+    if (inputMethod === 'timeout') {
+      isTransitioningRef.current = true;
+      setShowExpiredAnswer(true);
+      setTimeout(() => {
+        advanceToNext();
+      }, 3000);
+    } else {
+      advanceToNext();
+    }
+  }, [currentProblem, status, attemptsCount, results, currentIndex, problems.length]);
+
   // Callback when voice recognition hears text
   const handleVoiceTranscript = useCallback((text: string) => {
-    if (status !== 'playing' || !text) return;
+    if (status !== 'playing' || !text || isTransitioningRef.current || !currentProblem) return;
 
-    // Process new transcript text
-    const parsedNumber = parseNumberFromUtterance(text);
-    if (parsedNumber !== null && currentProblem) {
-      if (text !== processedUtteranceRef.current) {
-        processedUtteranceRef.current = text;
-        submitAnswer(parsedNumber, 'voice');
-      }
+    // Reset silence nudge on recognized speech
+    silenceTimeRef.current = 0;
+    setShowSilenceNudge(false);
+
+    // Evaluate whole sentence or any substring token against expected answer
+    if (checkUtteranceMatchesAnswer(text, currentProblem.expectedAnswer)) {
+      submitAnswer(currentProblem.expectedAnswer, 'voice');
     }
-  }, [status, currentProblem]);
+  }, [status, currentProblem, submitAnswer]);
 
   const voiceRecognition = useVoiceRecognition({
     onTranscriptChange: handleVoiceTranscript,
@@ -60,11 +131,12 @@ export function useGameEngine() {
     setStatus('playing');
     setQuestionTimeLeft(QUESTION_TIME_LIMIT);
     setShowSilenceNudge(false);
+    setShowExpiredAnswer(false);
     silenceTimeRef.current = 0;
     setAttemptsCount(0);
     setKeypadInput('');
     setRestartCountdown(AUTO_RESTART_TIME);
-    processedUtteranceRef.current = '';
+    isTransitioningRef.current = false;
 
     const now = Date.now();
     startTimeRef.current = now;
@@ -95,67 +167,20 @@ export function useGameEngine() {
     setRestartCountdown(AUTO_RESTART_TIME);
   }, [voiceRecognition]);
 
-  // Submit an answer (from voice or keypad or timeout)
-  const submitAnswer = useCallback((
-    answer: number | undefined,
-    inputMethod: 'voice' | 'keypad' | 'timeout'
-  ) => {
-    if (!currentProblem || status !== 'playing') return;
-
-    const timeSpent = Math.max(1, Math.round((Date.now() - questionStartTimeRef.current) / 1000));
-    const isCorrect = answer === currentProblem.expectedAnswer;
-
-    if (isCorrect) {
-      playCorrectChime();
-    }
-
-    const newResult: QuestionResult = {
-      questionId: currentProblem.id,
-      problem: `${currentProblem.operandA} x ${currentProblem.operandB}`,
-      expectedAnswer: currentProblem.expectedAnswer,
-      userAnswer: answer,
-      isCorrect,
-      timeSpentSeconds: timeSpent,
-      inputMethod,
-      attemptsCount: attemptsCount + 1,
-    };
-
-    const updatedResults = [...results, newResult];
-    setResults(updatedResults);
-
-    // Reset voice transcript & input for next question
-    voiceRecognition.resetTranscript();
-    processedUtteranceRef.current = '';
-    setKeypadInput('');
-    setAttemptsCount(0);
-    setShowSilenceNudge(false);
-    silenceTimeRef.current = 0;
-
-    const nextIndex = currentIndex + 1;
-    if (nextIndex < problems.length) {
-      setCurrentIndex(nextIndex);
-      setQuestionTimeLeft(QUESTION_TIME_LIMIT);
-      questionStartTimeRef.current = Date.now();
-    } else {
-      finishGame(updatedResults);
-    }
-  }, [currentProblem, status, attemptsCount, results, currentIndex, problems.length, finishGame, voiceRecognition]);
-
-  // Handle wrong attempt count bump
-  const recordFailedAttempt = useCallback(() => {
-    setAttemptsCount((prev) => prev + 1);
-  }, []);
+  finishGameRef.current = finishGame;
 
   // Question 30s countdown and 10s silence timer
   useEffect(() => {
     if (status !== 'playing') return;
 
     const timer = setInterval(() => {
+      if (isTransitioningRef.current) return;
+
       setQuestionTimeLeft((prev) => {
         if (prev <= 1) {
-          // Question timeout!
+          // Question timeout
           submitAnswer(undefined, 'timeout');
-          return QUESTION_TIME_LIMIT;
+          return 0;
         }
         return prev - 1;
       });
@@ -195,6 +220,7 @@ export function useGameEngine() {
     results,
     questionTimeLeft,
     showSilenceNudge,
+    showExpiredAnswer,
     restartCountdown,
     keypadInput,
     setKeypadInput,
@@ -202,6 +228,5 @@ export function useGameEngine() {
     voiceRecognition,
     startGame,
     submitAnswer,
-    recordFailedAttempt,
   };
 }

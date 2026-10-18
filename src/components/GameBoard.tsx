@@ -6,6 +6,7 @@ interface GameBoardProps {
   problem: MathProblem;
   timeLeft: number;
   showSilenceNudge: boolean;
+  showExpiredAnswer?: boolean;
   transcript: string;
   interimTranscript: string;
   isListening: boolean;
@@ -18,6 +19,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   problem,
   timeLeft,
   showSilenceNudge,
+  showExpiredAnswer = false,
   transcript,
   interimTranscript,
   isListening,
@@ -89,12 +91,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           Solve the problem
         </div>
 
-        <div
-          className="font-black text-indigo-900 tracking-tight select-none my-4"
-          style={{ fontSize: '72px', lineHeight: '1.1' }}
-        >
-          {problem.operandA} × {problem.operandB} = ?
-        </div>
+        {showExpiredAnswer ? (
+          <div
+            className="font-black text-rose-600 tracking-tight select-none my-4 animate-bounce"
+            style={{ fontSize: '64px', lineHeight: '1.1' }}
+          >
+            {problem.operandA} × {problem.operandB} = {problem.expectedAnswer}
+          </div>
+        ) : (
+          <div
+            className="font-black text-indigo-900 tracking-tight select-none my-4"
+            style={{ fontSize: '72px', lineHeight: '1.1' }}
+          >
+            {problem.operandA} × {problem.operandB} = ?
+          </div>
+        )}
 
         {/* Typed Keypad Display or Voice Feedback */}
         <div className="min-h-[50px] flex items-center justify-center">

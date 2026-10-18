@@ -2,12 +2,17 @@ const SMALL_NUMBERS: Record<string, number> = {
   zero: 0,
   one: 1,
   two: 2,
+  to: 2,
+  too: 2,
   three: 3,
   four: 4,
+  for: 4,
+  fore: 4,
   five: 5,
   six: 6,
   seven: 7,
   eight: 8,
+  ate: 8,
   nine: 9,
   ten: 10,
   eleven: 11,
@@ -25,7 +30,7 @@ const TENS_NUMBERS: Record<string, number> = {
   twenty: 20,
   thirty: 30,
   forty: 40,
-  fourty: 40, // Common misspelling/variant in speech recognition
+  fourty: 40,
   fifty: 50,
   sixty: 60,
   seventy: 70,
@@ -34,50 +39,85 @@ const TENS_NUMBERS: Record<string, number> = {
 };
 
 /**
- * Parses a numeric value from a child's spoken utterance.
- * Handles digits ("24"), hyphenated/compound words ("twenty-four", "twenty four", "forty two", "fourty-two"),
- * and single word numbers ("sixteen", "81").
+ * Extracts all numbers mentioned in an utterance.
+ * Handles digits ("24"), homophones ("for", "ate", "to"), compound words ("forty two", "forty-two"),
+ * and single words ("twelve", "81").
+ * Returns an array of numbers in order of appearance.
  */
-export function parseNumberFromUtterance(utterance: string): number | null {
-  if (!utterance) return null;
+export function extractNumbersFromUtterance(utterance: string): number[] {
+  if (!utterance) return [];
 
   const normalized = utterance
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/-/g, ' ')
     .trim();
 
-  // 1. Look for direct digits in text (e.g. "it's 24", "42")
-  const digitMatch = normalized.match(/\b\d+\b/);
-  if (digitMatch) {
-    const num = parseInt(digitMatch[0], 10);
-    if (!isNaN(num)) return num;
-  }
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  const foundNumbers: number[] = [];
 
-  // 2. Tokenize words and test multi-word or compound word number phrases
-  const words = normalized.replace(/-/g, ' ').split(/\s+/).filter(Boolean);
+  let i = 0;
+  while (i < tokens.length) {
+    const token = tokens[i];
 
-  // Check word pairs for tens + ones (e.g. "twenty four", "forty two")
-  for (let i = 0; i < words.length - 1; i++) {
-    const w1 = words[i];
-    const w2 = words[i + 1];
-    if (TENS_NUMBERS[w1] !== undefined && SMALL_NUMBERS[w2] !== undefined) {
-      return TENS_NUMBERS[w1] + SMALL_NUMBERS[w2];
+    // 1. Direct digit tokens (e.g. "42", "6", "18")
+    if (/^\d+$/.test(token)) {
+      foundNumbers.push(parseInt(token, 10));
+      i++;
+      continue;
     }
-  }
 
-  // Check for standalone tens words (e.g. "twenty")
-  for (const word of words) {
-    if (TENS_NUMBERS[word] !== undefined) {
-      return TENS_NUMBERS[word];
+    // 2. Check compound tens + ones (e.g. "forty two", "twenty-four")
+    if (TENS_NUMBERS[token] !== undefined) {
+      if (i + 1 < tokens.length && SMALL_NUMBERS[tokens[i + 1]] !== undefined) {
+        foundNumbers.push(TENS_NUMBERS[token] + SMALL_NUMBERS[tokens[i + 1]]);
+        i += 2;
+        continue;
+      }
+      foundNumbers.push(TENS_NUMBERS[token]);
+      i++;
+      continue;
     }
-  }
 
-  // Check for small numbers / teens (e.g. "twelve", "sixteen", "four")
-  for (const word of words) {
-    if (SMALL_NUMBERS[word] !== undefined) {
-      return SMALL_NUMBERS[word];
+    // 3. Small numbers / teens / homophones (e.g. "sixteen", "eight", "for" -> 4)
+    if (SMALL_NUMBERS[token] !== undefined) {
+      foundNumbers.push(SMALL_NUMBERS[token]);
+      i++;
+      continue;
     }
+
+    i++;
   }
 
-  return null;
+  return foundNumbers;
+}
+
+/**
+ * Checks if a target number was spoken in an utterance.
+ * Checks direct number presence, word matches, and substrings.
+ */
+export function checkUtteranceMatchesAnswer(utterance: string, expectedAnswer: number): boolean {
+  if (!utterance) return false;
+
+  const numbers = extractNumbersFromUtterance(utterance);
+  if (numbers.includes(expectedAnswer)) {
+    return true;
+  }
+
+  // Regex boundary match for exact integer in the raw utterance
+  const regex = new RegExp(`\\b${expectedAnswer}\\b`);
+  if (regex.test(utterance)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Legacy helper maintained for interface compatibility.
+ * Returns the most recent/relevant number extracted from utterance, if any.
+ */
+export function parseNumberFromUtterance(utterance: string): number | null {
+  const numbers = extractNumbersFromUtterance(utterance);
+  return numbers.length > 0 ? numbers[numbers.length - 1] : null;
 }

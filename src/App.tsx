@@ -14,6 +14,7 @@ export function App() {
     results,
     questionTimeLeft,
     showSilenceNudge,
+    showExpiredAnswer,
     restartCountdown,
     keypadInput,
     setKeypadInput,
@@ -71,6 +72,7 @@ export function App() {
                   problem={currentProblem}
                   timeLeft={questionTimeLeft}
                   showSilenceNudge={showSilenceNudge}
+                  showExpiredAnswer={showExpiredAnswer}
                   transcript={voiceRecognition.transcript}
                   interimTranscript={voiceRecognition.interimTranscript}
                   isListening={voiceRecognition.isListening}
