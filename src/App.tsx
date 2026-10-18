@@ -1,122 +1,109 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useGameEngine } from './hooks/useGameEngine';
+import { StartScreen } from './components/StartScreen';
+import { ProgressBar } from './components/ProgressBar';
+import { GameBoard } from './components/GameBoard';
+import { Keypad } from './components/Keypad';
+import { SummaryModal } from './components/SummaryModal';
 
-function App() {
-  const [count, setCount] = useState(0)
+export function App() {
+  const {
+    status,
+    currentProblem,
+    currentIndex,
+    totalQuestions,
+    results,
+    questionTimeLeft,
+    showSilenceNudge,
+    restartCountdown,
+    keypadInput,
+    setKeypadInput,
+    session,
+    voiceRecognition,
+    startGame,
+    submitAnswer,
+  } = useGameEngine();
+
+  const handleKeypadPress = (digit: string) => {
+    if (keypadInput.length < 3) {
+      setKeypadInput((prev) => prev + digit);
+    }
+  };
+
+  const handleKeypadDelete = () => {
+    setKeypadInput((prev) => prev.slice(0, -1));
+  };
+
+  const handleKeypadSubmit = () => {
+    if (!keypadInput) return;
+    const num = parseInt(keypadInput, 10);
+    if (!isNaN(num)) {
+      submitAnswer(num, 'keypad');
+    }
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="min-h-screen bg-slate-100 text-slate-800 font-sans flex flex-col justify-between py-6">
+      <header className="px-4 text-center mb-2">
+        <h1 className="text-xl font-black text-indigo-900 tracking-tight flex items-center justify-center gap-2">
+          ⚡ Math Sprint PWA
+        </h1>
+      </header>
 
-      <div className="ticks"></div>
+      <main className="flex-1 flex flex-col justify-center max-w-3xl mx-auto w-full">
+        {status === 'idle' && (
+          <StartScreen
+            onStart={startGame}
+            isVoiceSupported={voiceRecognition.isSupported}
+          />
+        )}
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        {(status === 'playing' || status === 'completed') && (
+          <>
+            <ProgressBar
+              currentIndex={currentIndex}
+              totalQuestions={totalQuestions}
+              results={results}
+            />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+            {currentProblem && status === 'playing' && (
+              <>
+                <GameBoard
+                  problem={currentProblem}
+                  timeLeft={questionTimeLeft}
+                  showSilenceNudge={showSilenceNudge}
+                  transcript={voiceRecognition.transcript}
+                  interimTranscript={voiceRecognition.interimTranscript}
+                  isListening={voiceRecognition.isListening}
+                  volumeLevel={voiceRecognition.volumeLevel}
+                  isSpeechDetected={voiceRecognition.isSpeechDetected}
+                  keypadInput={keypadInput}
+                />
+
+                <Keypad
+                  onNumberPress={handleKeypadPress}
+                  onDelete={handleKeypadDelete}
+                  onSubmit={handleKeypadSubmit}
+                  value={keypadInput}
+                />
+              </>
+            )}
+          </>
+        )}
+
+        {status === 'completed' && (
+          <SummaryModal
+            session={session}
+            restartCountdown={restartCountdown}
+            onPlayAgain={startGame}
+          />
+        )}
+      </main>
+
+      <footer className="text-center text-xs text-slate-400 mt-6">
+        Voice-Enabled Math Sprint • Designed for Kids
+      </footer>
+    </div>
+  );
 }
 
-export default App
+export default App;
