@@ -36,8 +36,15 @@ export function useGameEngine() {
 
   const currentProblem: MathProblem | undefined = problems[currentIndex];
 
-  // Forward declarations for callbacks
+  const currentProblemRef = useRef<MathProblem | undefined>(currentProblem);
+  const statusRef = useRef<GameStatus>(status);
   const finishGameRef = useRef<(finalResults: QuestionResult[]) => void>(() => {});
+  const resetTranscriptRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    currentProblemRef.current = currentProblem;
+    statusRef.current = status;
+  }, [currentProblem, status]);
 
   // Submit an answer (voice, keypad, or timeout)
   const submitAnswer = useCallback((
@@ -74,7 +81,7 @@ export function useGameEngine() {
     setResults(updatedResults);
 
     const advanceToNext = () => {
-      voiceRecognition.resetTranscript();
+      resetTranscriptRef.current();
       setKeypadInput('');
       setAttemptsCount(0);
       setShowSilenceNudge(false);
@@ -104,23 +111,35 @@ export function useGameEngine() {
     }
   }, [currentProblem, status, attemptsCount, results, currentIndex, problems.length]);
 
+  const submitAnswerRef = useRef(submitAnswer);
+  useEffect(() => {
+    submitAnswerRef.current = submitAnswer;
+  }, [submitAnswer]);
+
   // Callback when voice recognition hears text
   const handleVoiceTranscript = useCallback((text: string) => {
-    if (status !== 'playing' || !text || isTransitioningRef.current || !currentProblem) return;
+    const activeStatus = statusRef.current;
+    const activeProblem = currentProblemRef.current;
+
+    if (activeStatus !== 'playing' || !text || isTransitioningRef.current || !activeProblem) return;
 
     // Reset silence nudge on recognized speech
     silenceTimeRef.current = 0;
     setShowSilenceNudge(false);
 
     // Evaluate whole sentence or any substring token against expected answer
-    if (checkUtteranceMatchesAnswer(text, currentProblem.expectedAnswer)) {
-      submitAnswer(currentProblem.expectedAnswer, 'voice');
+    if (checkUtteranceMatchesAnswer(text, activeProblem.expectedAnswer)) {
+      submitAnswerRef.current(activeProblem.expectedAnswer, 'voice');
     }
-  }, [status, currentProblem, submitAnswer]);
+  }, []);
 
   const voiceRecognition = useVoiceRecognition({
     onTranscriptChange: handleVoiceTranscript,
   });
+
+  useEffect(() => {
+    resetTranscriptRef.current = voiceRecognition.resetTranscript;
+  }, [voiceRecognition.resetTranscript]);
 
   // Start new game session
   const startGame = useCallback(() => {
@@ -167,7 +186,9 @@ export function useGameEngine() {
     setRestartCountdown(AUTO_RESTART_TIME);
   }, [voiceRecognition]);
 
-  finishGameRef.current = finishGame;
+  useEffect(() => {
+    finishGameRef.current = finishGame;
+  }, [finishGame]);
 
   // Question 30s countdown and 10s silence timer
   useEffect(() => {
