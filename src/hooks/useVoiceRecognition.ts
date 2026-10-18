@@ -43,13 +43,15 @@ export interface UseVoiceRecognitionOptions {
 export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
   const { onTranscriptChange, noiseGateThreshold = 0.03 } = options;
 
+  const onTranscriptChangeRef = useRef(onTranscriptChange);
+
   const [transcript, setTranscript] = useState<string>('');
   const [interimTranscript, setInterimTranscript] = useState<string>('');
   const [isListening, setIsListening] = useState<boolean>(false);
   const [volumeLevel, setVolumeLevel] = useState<number>(0);
   const [isSpeechDetected, setIsSpeechDetected] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSupported, setIsSupported] = useState<boolean>(true);
+  const [isSupported] = useState<boolean>(() => typeof window !== 'undefined' && !!(window.SpeechRecognition || window.webkitSpeechRecognition));
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const shouldListenRef = useRef<boolean>(false);
@@ -59,13 +61,9 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
   const animFrameRef = useRef<number | null>(null);
   const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Check Web Speech API support
   useEffect(() => {
-    const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechClass) {
-      setIsSupported(false);
-    }
-  }, []);
+    onTranscriptChangeRef.current = onTranscriptChange;
+  }, [onTranscriptChange]);
 
   // Cleanup audio context and media stream
   const stopAudioAnalysis = useCallback(() => {
@@ -182,14 +180,14 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
         if (trimmedFinal) {
           setTranscript((prev) => {
             const updated = prev ? `${prev} ${trimmedFinal}` : trimmedFinal;
-            if (onTranscriptChange) onTranscriptChange(updated);
+            if (onTranscriptChangeRef.current) onTranscriptChangeRef.current(updated);
             return updated;
           });
         }
 
         setInterimTranscript(trimmedInterim);
-        if (trimmedInterim && onTranscriptChange) {
-          onTranscriptChange(trimmedInterim);
+        if (trimmedInterim && onTranscriptChangeRef.current) {
+          onTranscriptChangeRef.current(trimmedInterim);
         }
       };
 
@@ -224,7 +222,7 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions = {}) {
     } catch {
       // Recognition might already be running
     }
-  }, [onTranscriptChange, startAudioAnalysis]);
+  }, [startAudioAnalysis]);
 
   // Stop listening
   const stopListening = useCallback(() => {
