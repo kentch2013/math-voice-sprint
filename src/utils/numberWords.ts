@@ -40,34 +40,36 @@ const TENS_NUMBERS: Record<string, number> = {
 
 const CHINESE_DIGIT_MAP: Record<string, number> = {
   // 0
-  '零': 0, '〇': 0, '领': 0, '另': 0, '凌': 0, '玲': 0, '羚': 0,
+  '零': 0, '〇': 0, '领': 0, '另': 0, '凌': 0, '玲': 0, '羚': 0, '呤': 0, '伶': 0, '聆': 0,
   // 1
-  '一': 1, '壹': 1, '幺': 1, '依': 1, '医': 1, '易': 1, '意': 1, '移': 1, '怡': 1,
+  '一': 1, '壹': 1, '幺': 1, '依': 1, '医': 1, '易': 1, '意': 1, '移': 1, '怡': 1, '宜': 1, '艺': 1, '译': 1, '益': 1, '溢': 1, '议': 1,
   // 2
-  '二': 2, '贰': 2, '俩': 2, '兩': 2, '两': 2, '尔': 2, '洱': 2, '饵': 2,
+  '二': 2, '贰': 2, '俩': 2, '兩': 2, '两': 2, '尔': 2, '洱': 2, '饵': 2, '珥': 2, '咡': 2, '佴': 2,
   // 3
-  '三': 3, '叁': 3, '伞': 3, '散': 3, '衫': 3, '参': 3,
+  '三': 3, '叁': 3, '伞': 3, '散': 3, '衫': 3, '参': 3, '钐': 3,
   // 4
-  '四': 4, '肆': 4, '死': 4, '似': 4, '寺': 4, '事': 4, '士': 4, '视': 4, '试': 4,
+  '四': 4, '肆': 4, '死': 4, '似': 4, '寺': 4, '事': 4, '士': 4, '视': 4, '试': 4, '是': 4, '斯': 4, '丝': 4, '思': 4, '私': 4, '撕': 4, '司': 4, '词': 4, '赐': 4, '誓': 4, '逝': 4, '狮': 4,
   // 5
-  '五': 5, '伍': 5, '武': 5, '舞': 5, '屋': 5, '误': 5, '无': 5, '悟': 5, '雾': 5,
+  '五': 5, '伍': 5, '武': 5, '舞': 5, '屋': 5, '误': 5, '无': 5, '悟': 5, '雾': 5, '呜': 5, '乌': 5, '侮': 5,
   // 6
-  '六': 6, '陆': 6, '溜': 6, '流': 6, '留': 6, '柳': 6, '刘': 6,
+  '六': 6, '陆': 6, '溜': 6, '流': 6, '留': 6, '柳': 6, '刘': 6, '遛': 6, '硫': 6, '馏': 6,
   // 7
-  '七': 7, '柒': 7, '漆': 7, '妻': 7, '齐': 7, '奇': 7, '棋': 7, '气': 7, '企': 7,
+  '七': 7, '柒': 7, '漆': 7, '妻': 7, '齐': 7, '奇': 7, '棋': 7, '气': 7, '企': 7, '戚': 7, '沏': 7, '欺': 7,
   // 8
-  '八': 8, '捌': 8, '吧': 8, '爸': 8, '巴': 8, '扒': 8, '拔': 8, '霸': 8,
+  '八': 8, '捌': 8, '吧': 8, '爸': 8, '巴': 8, '扒': 8, '拔': 8, '霸': 8, '靶': 8, '耙': 8, '疤': 8,
   // 9
-  '九': 9, '玖': 9, '酒': 9, '久': 9, '就': 9, '旧': 9, '救': 9, '舅': 9,
+  '九': 9, '玖': 9, '酒': 9, '久': 9, '就': 9, '旧': 9, '救': 9, '舅': 9, '韭': 9, '纠': 9,
   // 10
-  '十': 10, '拾': 10, '实': 10, '食': 10, '石': 10, '时': 10,
+  '十': 10, '拾': 10, '实': 10, '食': 10, '石': 10, '时': 10, '识': 10, '史': 10,
 };
 
 const CHINESE_DIGITS_1_9_CHARS = Object.keys(CHINESE_DIGIT_MAP)
   .filter((k) => CHINESE_DIGIT_MAP[k] >= 1 && CHINESE_DIGIT_MAP[k] <= 9)
   .join('');
 
-const CHINESE_TEN_MARKERS = '十拾实食石时久';
+const CHINESE_TEN_MARKERS = Object.keys(CHINESE_DIGIT_MAP)
+  .filter((k) => CHINESE_DIGIT_MAP[k] === 10)
+  .join('');
 
 function normalizeChineseNumbers(text: string): string {
   if (!text) return text;
@@ -75,11 +77,16 @@ function normalizeChineseNumbers(text: string): string {
   // Convert full-width digits (０-９) to ASCII digits (0-9)
   let result = text.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
 
+  // Strip common conversational prefixes like "答案是", "那是", "就是", etc.
+  result = result.replace(/(答案|那|就|肯定|应该|可能|主要)是/g, ' ');
+  // Strip repeated copula filler "是是是...", "是是"
+  result = result.replace(/是{2,}/g, ' ');
+
   // Handle "一百" / 100
   result = result.replace(/(一百|壹佰|一佰)/g, ' 100 ');
 
   // Replace compound Chinese numbers first
-  // 1. [tens] [ten_marker] [ones] e.g. "酒拾九" -> 99, "九久九" -> 99, "八十一" -> 81
+  // 1. [tens] [ten_marker] [ones] e.g. "酒拾九" -> 99, "八十一" -> 81, "尔拾肆" -> 24
   const compoundTensOnesRegex = new RegExp(
     `([${CHINESE_DIGITS_1_9_CHARS}])([${CHINESE_TEN_MARKERS}])([${CHINESE_DIGITS_1_9_CHARS}])`,
     'g'
@@ -90,7 +97,7 @@ function normalizeChineseNumbers(text: string): string {
     return ` ${(t * 10 + o).toString()} `;
   });
 
-  // 2. [tens] [ten_marker] e.g. "酒拾" -> 90, "九久" -> 90, "久久" -> 90, "二十" -> 20
+  // 2. [tens] [ten_marker] e.g. "酒拾" -> 90, "二十" -> 20, "尔拾" -> 20
   const compoundTensRegex = new RegExp(
     `([${CHINESE_DIGITS_1_9_CHARS}])([${CHINESE_TEN_MARKERS}])`,
     'g'
@@ -100,9 +107,19 @@ function normalizeChineseNumbers(text: string): string {
     return ` ${(t * 10).toString()} `;
   });
 
+  // Special 90/99 speech homophone pattern with '久' (e.g. "九久九" -> 99, "九久" -> 90, "久久" -> 90)
+  result = result.replace(
+    new RegExp(`([九玖酒久])久([${CHINESE_DIGITS_1_9_CHARS}])`, 'g'),
+    (_, _tens, ones) => {
+      const o = CHINESE_DIGIT_MAP[ones] ?? 0;
+      return ` ${(90 + o).toString()} `;
+    }
+  );
+  result = result.replace(new RegExp(`([九玖酒久])久`, 'g'), ' 90 ');
+
   // 3. [ten_marker] [ones] e.g. "十六" -> 16, "拾六" -> 16
   const compoundOnesRegex = new RegExp(
-    `([十拾实食石时])([${CHINESE_DIGITS_1_9_CHARS}])`,
+    `([${CHINESE_TEN_MARKERS}])([${CHINESE_DIGITS_1_9_CHARS}])`,
     'g'
   );
   result = result.replace(compoundOnesRegex, (_, _tenMarker, ones) => {
@@ -111,7 +128,13 @@ function normalizeChineseNumbers(text: string): string {
   });
 
   // 4. Standalone ten markers
-  result = result.replace(/[十拾]/g, ' 10 ');
+  const tenMarkersRegex = new RegExp(`[${CHINESE_TEN_MARKERS}]`, 'g');
+  result = result.replace(tenMarkersRegex, ' 10 ');
+
+  // Strip copula "是" preceding any digit or Chinese number word so it doesn't parse as false 4
+  const digitChars = Object.keys(CHINESE_DIGIT_MAP).join('');
+  const copulaBeforeDigitRegex = new RegExp(`是(?=\\s*[0-9${digitChars}])`, 'g');
+  result = result.replace(copulaBeforeDigitRegex, ' ');
 
   // 5. Replace remaining single Chinese digits e.g. 六 -> 6, 酒 -> 9
   const singleDigitsChars = Object.keys(CHINESE_DIGIT_MAP).join('');
