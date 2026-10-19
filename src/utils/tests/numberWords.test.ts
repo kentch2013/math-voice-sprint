@@ -53,6 +53,30 @@ describe('numberWords', () => {
       expect(extractNumbersFromUtterance('酒拾')).toEqual([90]);
       expect(extractNumbersFromUtterance('酒拾九')).toEqual([99]);
       expect(extractNumbersFromUtterance('九久九')).toEqual([99]);
+
+      // Expanded homophone tests for all digits 0-10
+      expect(extractNumbersFromUtterance('领')).toEqual([0]);
+      expect(extractNumbersFromUtterance('依')).toEqual([1]);
+      expect(extractNumbersFromUtterance('洱')).toEqual([2]);
+      expect(extractNumbersFromUtterance('伞')).toEqual([3]);
+      expect(extractNumbersFromUtterance('寺')).toEqual([4]);
+      expect(extractNumbersFromUtterance('武')).toEqual([5]);
+      expect(extractNumbersFromUtterance('溜')).toEqual([6]);
+      expect(extractNumbersFromUtterance('柒')).toEqual([7]);
+      expect(extractNumbersFromUtterance('捌')).toEqual([8]);
+      expect(extractNumbersFromUtterance('玖')).toEqual([9]);
+      expect(extractNumbersFromUtterance('拾')).toEqual([10]);
+      expect(extractNumbersFromUtterance('实')).toEqual([10]);
+    });
+
+    it('handles conversational prefixes and strips copula 是 properly', () => {
+      expect(extractNumbersFromUtterance('答案是二十四')).toEqual([24]);
+      expect(extractNumbersFromUtterance('答案是九')).toEqual([9]);
+      expect(extractNumbersFromUtterance('就是四')).toEqual([4]);
+      expect(extractNumbersFromUtterance('那是七')).toEqual([7]);
+      expect(extractNumbersFromUtterance('是是是二十四')).toEqual([24]);
+      expect(extractNumbersFromUtterance('是二十四')).toEqual([24]);
+      expect(extractNumbersFromUtterance('尔拾肆')).toEqual([24]);
     });
 
     it('extracts repeated single digits and concatenated speech runs', () => {
@@ -92,6 +116,26 @@ describe('numberWords', () => {
       expect(checkUtteranceMatchesAnswer('酒拾九', 99)).toBe(true);
       expect(checkUtteranceMatchesAnswer('九久九', 99)).toBe(true);
       expect(checkUtteranceMatchesAnswer('答案是酒', 9)).toBe(true);
+
+      // Homophone tests across digits 0-10
+      expect(checkUtteranceMatchesAnswer('领', 0)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('依', 1)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('尔', 2)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('伞', 3)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('死', 4)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('武', 5)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('溜', 6)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('柒', 7)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('捌', 8)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('玖', 9)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('拾', 10)).toBe(true);
+
+      // Compound answers and conversational prefixes
+      expect(checkUtteranceMatchesAnswer('尔拾肆', 24)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('就是二十四', 24)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('是是是二十四', 24)).toBe(true);
+      expect(checkUtteranceMatchesAnswer('答案是九', 9)).toBe(true);
+      expect(extractNumbersFromUtterance('答案是九')).toEqual([9]);
     });
 
     it('returns true for repeated digits and concatenated runs matching expected answer', () => {
